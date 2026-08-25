@@ -47,8 +47,10 @@ const formMessage = document.querySelector('#formMessage');
 const lightbox = document.querySelector('#imageLightbox');
 const lightboxImage = document.querySelector('#lightboxImage');
 const lightboxCaption = document.querySelector('#lightboxCaption');
+const reviewsHeading = document.querySelector('.reviews-heading');
 let lightboxImages = [];
 let lightboxIndex = 0;
+let reviewsExpanded = false;
 
 fileInput.multiple = true;
 document.querySelector('.file-label').childNodes[1].textContent = ' Adjuntar hasta 4 fotos ';
@@ -111,6 +113,72 @@ document.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowRight') document.querySelector('#lightboxNext').click();
 });
 
+function updateReviewVisibility() {
+    const reviewCards = [...reviewList.querySelectorAll('.review-card')];
+    const visibleReviewCount = 3;
+    const hiddenReviewCards = reviewCards.slice(visibleReviewCount);
+
+    hiddenReviewCards.forEach((card) => {
+        card.classList.toggle('review-card-hidden', !reviewsExpanded);
+    });
+
+    let moreButton = reviewList.querySelector('.reviews-more-button');
+    if (!hiddenReviewCards.length) {
+        reviewsExpanded = false;
+        moreButton?.remove();
+        return;
+    }
+
+    if (!moreButton) {
+        moreButton = document.createElement('button');
+        moreButton.className = 'reviews-more-button';
+        moreButton.type = 'button';
+        moreButton.addEventListener('click', () => {
+            reviewsExpanded = !reviewsExpanded;
+            updateReviewVisibility();
+        });
+        reviewList.appendChild(moreButton);
+    }
+    moreButton.textContent = reviewsExpanded
+        ? 'Ver menos comentarios'
+        : 'Ver más comentarios';
+}
+
+function updateRatingSummary() {
+    const ratings = [...reviewList.querySelectorAll('.review-card .stars')]
+        .map((stars) => (stars.textContent.match(/★/g) || []).length)
+        .filter((rating) => rating >= 1 && rating <= 5);
+    const totalRatings = ratings.length;
+    const ratingCounts = [5, 4, 3, 2, 1].map((rating) => ({
+        rating,
+        count: ratings.filter((value) => value === rating).length
+    }));
+    const average = totalRatings
+        ? (ratings.reduce((sum, rating) => sum + rating, 0) / totalRatings).toFixed(1)
+        : '0.0';
+
+    let ratingSummary = reviewsHeading.querySelector('.rating-summary');
+    if (!ratingSummary) {
+        ratingSummary = document.createElement('aside');
+        ratingSummary.className = 'rating-summary';
+        reviewsHeading.appendChild(ratingSummary);
+    }
+
+    ratingSummary.innerHTML = `
+        <div class="rating-overview">
+            <strong>${average}</strong>
+            <span class="rating-star" aria-hidden="true">★</span>
+            <small>${totalRatings} comentario${totalRatings === 1 ? '' : 's'}</small>
+        </div>
+        <div class="rating-breakdown">
+            ${ratingCounts.map(({ rating, count }) => {
+                const percentage = totalRatings ? (count / totalRatings) * 100 : 0;
+                return `<div class="rating-row"><span>${rating}</span><span class="rating-row-star">★</span><span class="rating-bar"><span style="width: ${percentage}%"></span></span><small>${Math.round(percentage)}%</small></div>`;
+            }).join('')}
+        </div>
+    `;
+}
+
 function renderReview(review) {
     const card = document.createElement('article');
     card.className = 'review-card';
@@ -151,6 +219,8 @@ function renderReview(review) {
     }
 
     reviewList.prepend(card);
+    updateReviewVisibility();
+    updateRatingSummary();
 }
 
 async function loadReviews() {
@@ -167,6 +237,8 @@ async function loadReviews() {
     // Conservamos los dos comentarios de ejemplo del HTML
     // y añadimos los comentarios reales de Supabase.
     data.forEach(renderReview);
+    updateReviewVisibility();
+    updateRatingSummary();
 }
 
 reviewForm.addEventListener('submit', async (event) => {
@@ -237,4 +309,5 @@ reviewForm.addEventListener('submit', async (event) => {
 });
 
 // Cargar comentarios existentes al abrir la página
+updateRatingSummary();
 loadReviews();
